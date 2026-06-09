@@ -1,0 +1,686 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>⚽ World Cup 2026 Sweepstake Tracker</title>
+<style>
+:root { color-scheme: light; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #eef3ee;
+  color: #111;
+  min-height: 100vh;
+}
+
+/* ── HEADER ── */
+.header {
+  background: linear-gradient(135deg, #0d3b1f 0%, #1a6b35 100%);
+  color: #fff;
+  text-align: center;
+  padding: 22px 16px 18px;
+  position: relative;
+}
+.header-emoji { font-size: 40px; display: block; margin-bottom: 6px; }
+.header-title {
+  font-size: clamp(20px, 4vw, 32px);
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  background: linear-gradient(135deg, #ffd700, #ffb300);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.header-sub {
+  font-size: 12px; color: rgba(255,255,255,0.6);
+  letter-spacing: 3px; text-transform: uppercase; margin-top: 4px;
+}
+
+/* ── REFRESH BAR ── */
+.refresh-bar {
+  background: #fff;
+  border-bottom: 1px solid #d8e8d8;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 16px; gap: 12px;
+  font-size: 12px; color: #666;
+  flex-wrap: wrap;
+}
+.refresh-bar .status-dot {
+  display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+  background: #ccc; margin-right: 5px;
+  vertical-align: middle;
+}
+.refresh-bar .status-dot.ok { background: #1a6b35; }
+.refresh-bar .status-dot.err { background: #c0392b; }
+.refresh-btn {
+  background: #1a6b35; color: #fff;
+  border: none; border-radius: 6px;
+  padding: 6px 14px; font-size: 12px; cursor: pointer;
+  font-weight: 600; transition: background 0.2s; white-space: nowrap;
+}
+.refresh-btn:hover { background: #0d3b1f; }
+.refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+/* ── CONTAINER ── */
+.container { max-width: 1040px; margin: 0 auto; padding: 16px; }
+
+/* ── LEADERBOARD ── */
+.leaderboard-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #d0e4d0;
+  overflow: hidden;
+  margin-bottom: 20px;
+  box-shadow: 0 2px 12px rgba(0,60,0,0.06);
+}
+.section-title {
+  background: linear-gradient(135deg, #0d3b1f, #1a6b35);
+  color: #ffd700;
+  padding: 11px 16px;
+  font-size: 12px; font-weight: 800;
+  letter-spacing: 3px; text-transform: uppercase;
+  display: flex; align-items: center; gap: 8px;
+}
+
+.lb-row {
+  display: flex; align-items: center;
+  padding: 10px 14px;
+  border-bottom: 1px solid #f4f4f4;
+  gap: 10px;
+  transition: background 0.1s;
+}
+.lb-row:last-child { border-bottom: none; }
+.lb-row:hover { background: #f8fbf8; }
+
+.lb-rank {
+  font-size: 16px; font-weight: 900; color: #bbb;
+  width: 28px; text-align: center; flex-shrink: 0;
+}
+.lb-rank.p1 { color: #c8960c; }
+.lb-rank.p2 { color: #8a9ba8; }
+.lb-rank.p3 { color: #a0722d; }
+
+.lb-avatar {
+  width: 34px; height: 34px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 15px; color: #fff;
+  flex-shrink: 0;
+}
+
+.lb-name { flex: 1; font-weight: 700; font-size: 15px; }
+.lb-meta { font-size: 11px; color: #999; }
+
+.lb-bar-wrap { width: 120px; height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+.lb-bar { height: 100%; border-radius: 3px; background: linear-gradient(90deg, #1a6b35, #52c27a); transition: width 0.6s ease; }
+
+.lb-pts {
+  text-align: right; min-width: 52px;
+  font-size: 22px; font-weight: 900;
+}
+.lb-pts-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── PLAYERS GRID ── */
+.players-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 14px;
+}
+
+.player-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #d0e4d0;
+  overflow: hidden;
+  box-shadow: 0 2px 10px rgba(0,60,0,0.05);
+}
+
+.player-header {
+  display: flex; align-items: center;
+  padding: 12px 14px;
+  gap: 10px;
+  border-bottom: 2px solid #f0f7f0;
+}
+
+.p-avatar {
+  width: 42px; height: 42px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-weight: 900; font-size: 18px; color: #fff;
+  flex-shrink: 0;
+}
+
+.p-name { font-weight: 900; font-size: 16px; text-transform: uppercase; letter-spacing: 1px; }
+.p-sub { font-size: 11px; color: #888; margin-top: 1px; }
+
+.p-pts { text-align: right; }
+.p-pts-num {
+  font-size: 28px; font-weight: 900; line-height: 1;
+}
+.p-pts-label { font-size: 10px; color: #aaa; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ── TEAM ROWS ── */
+.teams-list { padding: 8px 10px 10px; }
+
+.team-row {
+  display: flex; align-items: center;
+  padding: 5px 7px;
+  border-radius: 8px;
+  margin-bottom: 2px;
+  gap: 7px;
+}
+
+.team-row.active   { background: #f0faf0; }
+.team-row.winner   { background: #fffce0; border: 1px solid #ffd700; }
+.team-row.eliminated { background: #fafafa; opacity: 0.5; }
+.team-row.pending  { background: #fafafa; }
+
+.t-flag { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
+.t-name { flex: 1; font-size: 12px; font-weight: 700; }
+.t-record { font-size: 11px; color: #999; white-space: nowrap; margin-right: 2px; }
+
+.t-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
+  padding: 2px 6px; border-radius: 10px; white-space: nowrap; flex-shrink: 0;
+}
+.badge-winner    { background: #ffd700; color: #5a3e00; }
+.badge-runnerup  { background: #c0392b; color: #fff; }
+.badge-sf        { background: #ede4fa; color: #6f42c1; }
+.badge-qf        { background: #d1ecf1; color: #0c5460; }
+.badge-r16       { background: #d4edda; color: #155724; }
+.badge-r32       { background: #fff3cd; color: #856404; }
+.badge-active    { background: #d4edda; color: #155724; }
+.badge-out       { background: #f8d7da; color: #721c24; }
+.badge-pending   { background: #f0f0f0; color: #888; }
+
+/* ── LOADING ── */
+.loading-wrap {
+  text-align: center; padding: 60px 20px; color: #666;
+}
+.spinner {
+  display: inline-block; width: 36px; height: 36px;
+  border: 3px solid #e0e0e0; border-top-color: #1a6b35;
+  border-radius: 50%; animation: spin 0.7s linear infinite;
+  margin-bottom: 14px;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.error-box {
+  background: #fff3f3; border: 1px solid #f5c6cb;
+  border-radius: 10px; padding: 16px; color: #721c24;
+  text-align: center; margin: 20px 0;
+  font-size: 14px; line-height: 1.6;
+}
+
+/* ── SCORING INFO ── */
+.scoring-info {
+  background: #fff;
+  border-radius: 10px;
+  border: 1px solid #d0e4d0;
+  padding: 12px 16px;
+  margin-bottom: 20px;
+  font-size: 12px; color: #555;
+  line-height: 1.7;
+}
+.scoring-info strong { color: #1a6b35; }
+
+/* ── FOOTER ── */
+.footer {
+  text-align: center; padding: 20px;
+  font-size: 11px; color: #aaa;
+}
+
+@media (max-width: 640px) {
+  .players-grid { grid-template-columns: 1fr; }
+  .lb-bar-wrap { display: none; }
+}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <span class="header-emoji">🏆</span>
+  <h1 class="header-title">World Cup 2026 Sweepstake</h1>
+  <div class="header-sub">Live Tracker</div>
+</div>
+
+<div class="refresh-bar">
+  <span id="lastUpdated">
+    <span class="status-dot" id="statusDot"></span>
+    <span id="statusText">Loading…</span>
+  </span>
+  <button class="refresh-btn" id="refreshBtn" onclick="loadData()">↻ Refresh</button>
+</div>
+
+<div class="container">
+  <div id="main" class="loading-wrap">
+    <div class="spinner"></div>
+    <div>Fetching latest World Cup data…</div>
+  </div>
+</div>
+
+<div class="footer">
+  Data: <a href="https://github.com/openfootball/worldcup.json" target="_blank" style="color:#1a6b35">openfootball/worldcup.json</a> · Updated ~daily
+</div>
+
+<script>
+// ──────────────────────────────────────────────────────────────────────────
+// DRAW ASSIGNMENTS (from the sweepstake draw)
+// ──────────────────────────────────────────────────────────────────────────
+const DRAW = [
+  {
+    name: 'Fin', color: '#e74c3c', color2: '#c0392b',
+    teams: ['Algeria','Senegal','Croatia','Argentina','Ivory Coast','Iran','Australia','Uruguay']
+  },
+  {
+    name: 'Ellen', color: '#3498db', color2: '#2980b9',
+    teams: ['Netherlands','Japan','Qatar','Colombia','USA','Tunisia','England','Paraguay']
+  },
+  {
+    name: 'Kieran', color: '#2ecc71', color2: '#27ae60',
+    teams: ['Austria','Morocco','Ecuador','Ghana','South Korea','Scotland','France','Sweden']
+  },
+  {
+    name: 'Rachael', color: '#f39c12', color2: '#d68910',
+    teams: ['Bosnia & Herz.','Curaçao','Turkey','Brazil','Iraq','Jordan','Cape Verde','Saudi Arabia']
+  },
+  {
+    name: 'Ian', color: '#9b59b6', color2: '#8e44ad',
+    teams: ['Germany','Mexico','Canada','Czech Republic','Portugal','Switzerland','DR Congo','Egypt']
+  },
+  {
+    name: 'Jane', color: '#1abc9c', color2: '#16a085',
+    teams: ['Panama','Spain','South Africa','Belgium','New Zealand','Haiti','Uzbekistan','Norway']
+  }
+];
+
+// Team flags
+const FLAGS = {
+  'Algeria':'🇩🇿','Argentina':'🇦🇷','Australia':'🇦🇺','Austria':'🇦🇹','Belgium':'🇧🇪',
+  'Bosnia & Herz.':'🇧🇦','Brazil':'🇧🇷','Canada':'🇨🇦','Cape Verde':'🇨🇻',
+  'Colombia':'🇨🇴','Croatia':'🇭🇷','Curaçao':'🇨🇼','Czech Republic':'🇨🇿',
+  'DR Congo':'🇨🇩','Ecuador':'🇪🇨','Egypt':'🇪🇬','England':'🏴󠁧󠁢󠁥󠁮󠁧󠁿','France':'🇫🇷',
+  'Germany':'🇩🇪','Ghana':'🇬🇭','Haiti':'🇭🇹','Iran':'🇮🇷','Iraq':'🇮🇶',
+  'Ivory Coast':'🇨🇮','Japan':'🇯🇵','Jordan':'🇯🇴','Mexico':'🇲🇽','Morocco':'🇲🇦',
+  'Netherlands':'🇳🇱','New Zealand':'🇳🇿','Norway':'🇳🇴','Panama':'🇵🇦',
+  'Paraguay':'🇵🇾','Portugal':'🇵🇹','Qatar':'🇶🇦','Saudi Arabia':'🇸🇦',
+  'Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Senegal':'🇸🇳','South Africa':'🇿🇦','South Korea':'🇰🇷',
+  'Spain':'🇪🇸','Sweden':'🇸🇪','Switzerland':'🇨🇭','Tunisia':'🇹🇳','Turkey':'🇹🇷',
+  'USA':'🇺🇸','Uruguay':'🇺🇾','Uzbekistan':'🇺🇿'
+};
+
+// JSON → sweepstake name aliases
+const ALIASES = {
+  'United States': 'USA',
+  "Côte d'Ivoire": 'Ivory Coast',
+  'Ivory Coast': 'Ivory Coast',
+  'Korea Republic': 'South Korea',
+  'South Korea': 'South Korea',
+  'Bosnia-Herzegovina': 'Bosnia & Herz.',
+  'Bosnia and Herzegovina': 'Bosnia & Herz.',
+  'Bosnia & Herzegovina': 'Bosnia & Herz.',
+  'DR Congo': 'DR Congo',
+  'Congo DR': 'DR Congo',
+  "Cote d'Ivoire": 'Ivory Coast',
+  'IR Iran': 'Iran',
+  'Korea DPR': 'DR Congo', // just in case
+};
+
+function norm(name) {
+  return ALIASES[name] || name;
+}
+
+// Knockout round ordering (higher = further)
+const ROUND_ORDER = {
+  'Round of 32': 1,
+  'Round of 16': 2,
+  'Quarter-final': 3,
+  'Semi-final': 4,
+  'Final': 5,
+};
+
+// Sweepstake bonus points per round won
+const ROUND_BONUS = {
+  'groups_qualified': 3,   // qualified from group stage
+  'Round of 32': 5,
+  'Round of 16': 10,
+  'Quarter-final': 15,
+  'Semi-final': 20,
+  'Final_winner': 30,
+  'Final_runnerup': 0,
+};
+
+// ──────────────────────────────────────────────────────────────────────────
+// DATA LOADING + PROCESSING
+// ──────────────────────────────────────────────────────────────────────────
+const DATA_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+
+async function loadData() {
+  const btn = document.getElementById('refreshBtn');
+  btn.disabled = true;
+  document.getElementById('statusText').textContent = 'Loading…';
+  document.getElementById('statusDot').className = 'status-dot';
+
+  try {
+    const resp = await fetch(DATA_URL + '?t=' + Date.now());
+    if (!resp.ok) throw new Error('HTTP ' + resp.status);
+    const data = await resp.json();
+
+    const teamStats = processMatches(data.matches || []);
+    renderAll(teamStats);
+
+    const now = new Date();
+    document.getElementById('statusText').textContent =
+      'Updated ' + now.toLocaleTimeString();
+    document.getElementById('statusDot').className = 'status-dot ok';
+  } catch(e) {
+    document.getElementById('statusText').textContent = 'Error loading data';
+    document.getElementById('statusDot').className = 'status-dot err';
+    document.getElementById('main').innerHTML = `
+      <div class="error-box">
+        ⚠️ Could not load match data.<br>
+        <small>${e.message}</small><br><br>
+        This may be a network issue. Try refreshing, or check your internet connection.<br>
+        <a href="${DATA_URL}" target="_blank" style="color:#721c24">View raw data</a>
+      </div>
+    `;
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+function processMatches(matches) {
+  // Build per-team stats
+  const stats = {}; // teamName -> stats object
+
+  function ensureTeam(name) {
+    if (!stats[name]) {
+      stats[name] = {
+        gp: 0, gw: 0, gd: 0, gl: 0, gf: 0, ga: 0, gpts: 0,
+        knockoutWins: {},   // round -> boolean (won)
+        knockoutLosses: {}, // round -> boolean (lost)
+        furthestRound: null,
+        isEliminated: false,
+        isWinner: false,
+        isRunnerUp: false,
+      };
+    }
+    return stats[name];
+  }
+
+  // Determine winner of a knockout match (handles ET and penalties)
+  function getWinner(match) {
+    const s = match.score;
+    if (!s) return null;
+    // Use penalties > extra time > full time
+    const [g1, g2] = s.p || s.et || s.ft || [null, null];
+    if (g1 === null) return null;
+    if (g1 > g2) return { winner: match.team1, loser: match.team2 };
+    if (g2 > g1) return { winner: match.team2, loser: match.team1 };
+    return null; // draw (shouldn't happen in knockouts)
+  }
+
+  // Track which teams have appeared in knockout rounds (= qualified from groups)
+  const appearedInKnockout = new Set();
+
+  for (const m of matches) {
+    const t1 = norm(m.team1);
+    const t2 = norm(m.team2);
+
+    // Skip TBD / placeholder teams (like W1, A1, etc.)
+    const isTBD = (n) => /^[A-Z]\d+$/.test(n) || /^W\d+$/.test(n) || /^L\d+$/.test(n) || n.length <= 3 && /\d/.test(n);
+    if (isTBD(t1) || isTBD(t2)) continue;
+
+    if (m.group) {
+      // GROUP STAGE
+      if (!m.score) continue; // not played yet
+      const [g1, g2] = m.score.ft || [0, 0];
+
+      const s1 = ensureTeam(t1);
+      const s2 = ensureTeam(t2);
+
+      s1.gp++; s2.gp++;
+      s1.gf += g1; s1.ga += g2;
+      s2.gf += g2; s2.ga += g1;
+
+      if (g1 > g2) {
+        s1.gw++; s1.gpts += 3; s2.gl++;
+      } else if (g1 === g2) {
+        s1.gd++; s1.gpts++;
+        s2.gd++; s2.gpts++;
+      } else {
+        s2.gw++; s2.gpts += 3; s1.gl++;
+      }
+    } else {
+      // KNOCKOUT STAGE
+      const round = m.round || '';
+      const roundOrder = ROUND_ORDER[round] || 0;
+      if (!roundOrder) continue;
+
+      // Just appearing in knockout means qualified from groups
+      [t1, t2].forEach(t => {
+        ensureTeam(t);
+        appearedInKnockout.add(t);
+        if (!stats[t].furthestRound || ROUND_ORDER[stats[t].furthestRound] < roundOrder) {
+          stats[t].furthestRound = round;
+        }
+      });
+
+      if (!m.score) continue; // not played yet
+
+      const result = getWinner(m);
+      if (!result) continue;
+
+      const { winner, loser } = result;
+
+      ensureTeam(winner);
+      ensureTeam(loser);
+
+      if (round === 'Final') {
+        stats[winner].isWinner = true;
+        stats[loser].isRunnerUp = true;
+        stats[loser].isEliminated = true;
+      } else {
+        stats[loser].isEliminated = true;
+      }
+
+      stats[winner].knockoutWins[round] = true;
+      stats[loser].knockoutLosses[round] = true;
+    }
+  }
+
+  return { stats, appearedInKnockout };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// SCORING
+// ──────────────────────────────────────────────────────────────────────────
+function calcPoints(teamName, stats, appearedInKnockout) {
+  const s = stats[teamName];
+  if (!s) return 0;
+
+  let pts = 0;
+
+  // Group points (3 per win, 1 per draw)
+  pts += s.gpts;
+
+  // Qualified from group stage
+  if (appearedInKnockout.has(teamName)) pts += ROUND_BONUS['groups_qualified'];
+
+  // Knockout wins
+  for (const round of Object.keys(s.knockoutWins)) {
+    if (round === 'Final') {
+      pts += ROUND_BONUS['Final_winner'];
+    } else {
+      pts += ROUND_BONUS[round] || 0;
+    }
+  }
+
+  return pts;
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// RENDERING
+// ──────────────────────────────────────────────────────────────────────────
+function getTeamStatus(teamName, s, appearedInKnockout) {
+  if (!s) return { label: 'Not Started', badgeClass: 'badge-pending', rowClass: 'pending' };
+  if (s.isWinner) return { label: '🏆 Winner!', badgeClass: 'badge-winner', rowClass: 'winner' };
+  if (s.isRunnerUp) return { label: 'Runner-up', badgeClass: 'badge-runnerup', rowClass: 'eliminated' };
+  if (s.isEliminated) {
+    const r = s.furthestRound;
+    const labels = { 'Round of 32': 'Out R32', 'Round of 16': 'Out R16', 'Quarter-final': 'Out QF', 'Semi-final': 'Out SF' };
+    return { label: labels[r] || 'Eliminated', badgeClass: 'badge-out', rowClass: 'eliminated' };
+  }
+  if (s.furthestRound) {
+    const r = s.furthestRound;
+    const labels = { 'Round of 32': 'R32', 'Round of 16': 'R16', 'Quarter-final': 'QF', 'Semi-final': 'SF', 'Final': 'Final' };
+    const classes = { 'Round of 32': 'badge-r32', 'Round of 16': 'badge-r16', 'Quarter-final': 'badge-qf', 'Semi-final': 'badge-sf', 'Final': 'badge-sf' };
+    return { label: '✓ ' + (labels[r] || r), badgeClass: classes[r] || 'badge-active', rowClass: 'active' };
+  }
+  // Still in group stage
+  if (s.gp > 0) {
+    return { label: 'Groups', badgeClass: 'badge-active', rowClass: 'active' };
+  }
+  return { label: 'Upcoming', badgeClass: 'badge-pending', rowClass: 'pending' };
+}
+
+function renderAll({ stats, appearedInKnockout }) {
+  // Calculate player totals
+  const players = DRAW.map(p => {
+    const total = p.teams.reduce((sum, t) => sum + calcPoints(t, stats, appearedInKnockout), 0);
+    const alive = p.teams.filter(t => {
+      const s = stats[t];
+      return !s || (!s.isEliminated && !s.isRunnerUp);
+    }).length;
+    return { ...p, total, alive };
+  }).sort((a, b) => b.total - a.total);
+
+  const maxPts = players[0]?.total || 1;
+
+  // Check if any matches have been played
+  const anyPlayed = Object.keys(stats).length > 0;
+
+  let html = '';
+
+  // ── SCORING KEY ──
+  html += `
+    <div class="scoring-info">
+      <strong>Points:</strong>
+      Group win <strong>+3</strong> · Draw <strong>+1</strong> ·
+      Qualify from groups <strong>+3</strong> ·
+      Win R32 <strong>+5</strong> · Win R16 <strong>+10</strong> ·
+      Win QF <strong>+15</strong> · Win SF <strong>+20</strong> ·
+      <strong>Tournament winner +30</strong>
+    </div>
+  `;
+
+  // ── LEADERBOARD ──
+  html += `<div class="leaderboard-card"><div class="section-title">🏅 Leaderboard</div>`;
+
+  if (!anyPlayed) {
+    html += `<div style="text-align:center;padding:24px 16px;color:#888;font-size:14px;">
+      ⚽ The tournament begins <strong>11 June 2026</strong> — check back then for live standings!
+    </div>`;
+  } else {
+    players.forEach((p, i) => {
+      const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
+      const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const barPct = maxPts > 0 ? Math.round((p.total / maxPts) * 100) : 0;
+      html += `
+        <div class="lb-row">
+          <div class="lb-rank ${rankClass}">${rankEmoji}</div>
+          <div class="lb-avatar" style="background:linear-gradient(135deg,${p.color},${p.color2})">${p.name[0]}</div>
+          <div style="flex:1">
+            <div class="lb-name">${p.name}</div>
+            <div class="lb-meta">${p.alive} team${p.alive !== 1 ? 's' : ''} still in</div>
+          </div>
+          <div class="lb-bar-wrap" style="margin-right:12px">
+            <div class="lb-bar" style="width:${barPct}%"></div>
+          </div>
+          <div>
+            <div class="lb-pts" style="color:${p.color}">${p.total}</div>
+            <div class="lb-pts-label">pts</div>
+          </div>
+        </div>
+      `;
+    });
+  }
+  html += `</div>`;
+
+  // ── PLAYER CARDS ──
+  html += `<div class="players-grid">`;
+
+  // Render in original draw order, not sorted
+  DRAW.forEach(p => {
+    const pData = players.find(x => x.name === p.name);
+    const total = pData?.total || 0;
+    const alive = pData?.alive ?? p.teams.length;
+
+    html += `
+      <div class="player-card">
+        <div class="player-header">
+          <div class="p-avatar" style="background:linear-gradient(135deg,${p.color},${p.color2})">${p.name[0]}</div>
+          <div style="flex:1">
+            <div class="p-name">${p.name}</div>
+            <div class="p-sub">${alive} of 8 teams still in</div>
+          </div>
+          <div class="p-pts">
+            <div class="p-pts-num" style="color:${p.color}">${total}</div>
+            <div class="p-pts-label">pts</div>
+          </div>
+        </div>
+        <div class="teams-list">
+    `;
+
+    // Sort teams: winner first, then by sweepstake pts desc, then eliminated last
+    const sorted = [...p.teams].sort((a, b) => {
+      const sa = stats[a], sb = stats[b];
+      if (sa?.isWinner && !sb?.isWinner) return -1;
+      if (!sa?.isWinner && sb?.isWinner) return 1;
+      const pa = calcPoints(a, stats, appearedInKnockout);
+      const pb = calcPoints(b, stats, appearedInKnockout);
+      if (pa !== pb) return pb - pa;
+      if (sa?.isEliminated && !sb?.isEliminated) return 1;
+      if (!sa?.isEliminated && sb?.isEliminated) return -1;
+      return 0;
+    });
+
+    sorted.forEach(teamName => {
+      const s = stats[teamName];
+      const { label, badgeClass, rowClass } = getTeamStatus(teamName, s, appearedInKnockout);
+      const flag = FLAGS[teamName] || '🏳';
+      const record = s && s.gp > 0
+        ? `${s.gw}W ${s.gd}D ${s.gl}L`
+        : '';
+      const teamPts = calcPoints(teamName, stats, appearedInKnockout);
+      const ptsDisplay = anyPlayed ? `<span style="font-size:11px;font-weight:700;color:#555;margin-right:4px">${teamPts}pt</span>` : '';
+
+      html += `
+        <div class="team-row ${rowClass}">
+          <span class="t-flag">${flag}</span>
+          <span class="t-name">${teamName}</span>
+          ${ptsDisplay}
+          <span class="t-record">${record}</span>
+          <span class="t-badge ${badgeClass}">${label}</span>
+        </div>
+      `;
+    });
+
+    html += `</div></div>`;
+  });
+
+  html += `</div>`;
+
+  document.getElementById('main').innerHTML = html;
+  document.getElementById('main').className = '';
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// BOOT
+// ──────────────────────────────────────────────────────────────────────────
+loadData();
+
+// Auto-refresh every 5 minutes
+setInterval(loadData, 5 * 60 * 1000);
+</script>
+</body>
+</html>
