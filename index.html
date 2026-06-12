@@ -52,7 +52,10 @@ body {
   vertical-align: middle;
 }
 .refresh-bar .status-dot.ok { background: #1a6b35; }
+.refresh-bar .status-dot.live { background: #e74c3c; animation: pulse 1.5s infinite; }
 .refresh-bar .status-dot.err { background: #c0392b; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
 .refresh-btn {
   background: #1a6b35; color: #fff;
   border: none; border-radius: 6px;
@@ -177,6 +180,14 @@ body {
 .t-flag { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
 .t-name { flex: 1; font-size: 12px; font-weight: 700; }
 .t-record { font-size: 11px; color: #999; white-space: nowrap; margin-right: 2px; }
+.t-gd {
+  font-size: 11px; font-weight: 700; white-space: nowrap;
+  padding: 1px 5px; border-radius: 4px;
+  flex-shrink: 0;
+}
+.t-gd.pos { background: #d4edda; color: #155724; }
+.t-gd.neg { background: #f8d7da; color: #721c24; }
+.t-gd.zero { background: #f0f0f0; color: #666; }
 
 .t-badge {
   font-size: 10px; font-weight: 700; letter-spacing: 0.3px;
@@ -259,12 +270,12 @@ body {
 </div>
 
 <div class="footer">
-  Data: <a href="https://github.com/openfootball/worldcup.json" target="_blank" style="color:#1a6b35">openfootball/worldcup.json</a> · Updated ~daily
+  Live data: <a href="https://worldcup26.ir" target="_blank" style="color:#1a6b35">worldcup26.ir</a> · Updates in real-time during matches · Auto-refreshes every 2 min
 </div>
 
 <script>
 // ──────────────────────────────────────────────────────────────────────────
-// DRAW ASSIGNMENTS (from the sweepstake draw)
+// DRAW ASSIGNMENTS
 // ──────────────────────────────────────────────────────────────────────────
 const DRAW = [
   {
@@ -305,31 +316,49 @@ const FLAGS = {
   'Paraguay':'🇵🇾','Portugal':'🇵🇹','Qatar':'🇶🇦','Saudi Arabia':'🇸🇦',
   'Scotland':'🏴󠁧󠁢󠁳󠁣󠁴󠁿','Senegal':'🇸🇳','South Africa':'🇿🇦','South Korea':'🇰🇷',
   'Spain':'🇪🇸','Sweden':'🇸🇪','Switzerland':'🇨🇭','Tunisia':'🇹🇳','Turkey':'🇹🇷',
-  'USA':'🇺🇸','Uruguay':'🇺🇾','Uzbekistan':'🇺🇿'
+  'USA':'🇺🇸','Uruguay':'🇺🇾','Uzbekistan':'🇺🇿','Iraq':'🇮🇶'
 };
 
-// JSON → sweepstake name aliases
+// API name → sweepstake name aliases
 const ALIASES = {
+  // USA
   'United States': 'USA',
+  'United States of America': 'USA',
+  // Ivory Coast
   "Côte d'Ivoire": 'Ivory Coast',
+  "Cote d'Ivoire": 'Ivory Coast',
   'Ivory Coast': 'Ivory Coast',
+  // South Korea
   'Korea Republic': 'South Korea',
+  'Republic of Korea': 'South Korea',
   'South Korea': 'South Korea',
+  // Bosnia
   'Bosnia-Herzegovina': 'Bosnia & Herz.',
   'Bosnia and Herzegovina': 'Bosnia & Herz.',
   'Bosnia & Herzegovina': 'Bosnia & Herz.',
-  'DR Congo': 'DR Congo',
+  // DR Congo
   'Congo DR': 'DR Congo',
-  "Cote d'Ivoire": 'Ivory Coast',
+  'Democratic Republic of the Congo': 'DR Congo',
+  'Democratic Republic of Congo': 'DR Congo',
+  // Iran
   'IR Iran': 'Iran',
-  'Korea DPR': 'DR Congo', // just in case
+  'Islamic Republic of Iran': 'Iran',
+  // Turkey
+  'Türkiye': 'Turkey',
+  'Turkiye': 'Turkey',
+  // Czech Republic
+  'Czechia': 'Czech Republic',
+  'Czech Republic': 'Czech Republic',
+  // Curaçao
+  'Curacao': 'Curaçao',
 };
 
 function norm(name) {
+  if (!name) return name;
   return ALIASES[name] || name;
 }
 
-// Knockout round ordering (higher = further)
+// Knockout round ordering
 const ROUND_ORDER = {
   'Round of 32': 1,
   'Round of 16': 2,
@@ -338,9 +367,22 @@ const ROUND_ORDER = {
   'Final': 5,
 };
 
-// Sweepstake bonus points per round won
+// Normalize round names from API
+function normRound(r) {
+  if (!r) return null;
+  const map = {
+    'round of 32': 'Round of 32', 'round_32': 'Round of 32', 'r32': 'Round of 32',
+    'round of 16': 'Round of 16', 'round_16': 'Round of 16', 'r16': 'Round of 16',
+    'quarter-final': 'Quarter-final', 'quarterfinal': 'Quarter-final', 'quarter final': 'Quarter-final', 'qf': 'Quarter-final',
+    'semi-final': 'Semi-final', 'semifinal': 'Semi-final', 'semi final': 'Semi-final', 'sf': 'Semi-final',
+    'final': 'Final',
+  };
+  return map[r.toLowerCase()] || r;
+}
+
+// Sweepstake bonus points per round
 const ROUND_BONUS = {
-  'groups_qualified': 3,   // qualified from group stage
+  'groups_qualified': 3,
   'Round of 32': 5,
   'Round of 16': 10,
   'Quarter-final': 15,
@@ -350,90 +392,155 @@ const ROUND_BONUS = {
 };
 
 // ──────────────────────────────────────────────────────────────────────────
-// DATA LOADING + PROCESSING
+// LIVE API (worldcup26.ir) — real-time updates during matches
 // ──────────────────────────────────────────────────────────────────────────
-const DATA_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+const API_BASE = 'https://worldcup26.ir';
+const GUEST_EMAIL = 'wc26-sweepstake-tracker-xk9m2@mailnull.com';
+const GUEST_PASS  = 'Tracker2026!xk9';
+let _token = null;
 
+async function getToken() {
+  if (_token) return _token;
+
+  // Try login first
+  try {
+    const r = await fetch(`${API_BASE}/auth/authenticate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: GUEST_EMAIL, password: GUEST_PASS })
+    });
+    const d = await r.json();
+    if (d.token) { _token = d.token; return _token; }
+  } catch(_) {}
+
+  // Not registered yet — register then login
+  try {
+    await fetch(`${API_BASE}/auth/register`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'WC26 Sweepstake Tracker', email: GUEST_EMAIL, password: GUEST_PASS })
+    });
+  } catch(_) {}
+
+  // Login after register
+  const r2 = await fetch(`${API_BASE}/auth/authenticate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email: GUEST_EMAIL, password: GUEST_PASS })
+  });
+  const d2 = await r2.json();
+  if (d2.token) { _token = d2.token; return _token; }
+
+  throw new Error('Auth failed');
+}
+
+async function fetchAPI(path, token) {
+  const r = await fetch(`${API_BASE}${path}`, {
+    headers: { 'Authorization': `Bearer ${token}` }
+  });
+  if (!r.ok) throw new Error(`API ${path} → HTTP ${r.status}`);
+  return r.json();
+}
+
+// Fallback: openfootball (daily updates)
+const FALLBACK_URL = 'https://raw.githubusercontent.com/openfootball/worldcup.json/master/2026/worldcup.json';
+
+// ──────────────────────────────────────────────────────────────────────────
+// DATA LOADING
+// ──────────────────────────────────────────────────────────────────────────
 async function loadData() {
   const btn = document.getElementById('refreshBtn');
   btn.disabled = true;
   document.getElementById('statusText').textContent = 'Loading…';
   document.getElementById('statusDot').className = 'status-dot';
 
+  let teamStats = null;
+  let usingLive = false;
+
+  // ── Try live API ──
   try {
-    const resp = await fetch(DATA_URL + '?t=' + Date.now());
-    if (!resp.ok) throw new Error('HTTP ' + resp.status);
-    const data = await resp.json();
+    const token = await getToken();
+    const [teamsData, gamesData] = await Promise.all([
+      fetchAPI('/get/teams', token),
+      fetchAPI('/get/games', token)
+    ]);
 
-    const teamStats = processMatches(data.matches || []);
-    renderAll(teamStats);
+    // Build id → normalised name map
+    const teamMap = {};
+    for (const t of teamsData) {
+      const id = String(t.id || t._id || '');
+      if (id) teamMap[id] = norm(t.name_en || t.name || '');
+    }
 
-    const now = new Date();
-    document.getElementById('statusText').textContent =
-      'Updated ' + now.toLocaleTimeString();
-    document.getElementById('statusDot').className = 'status-dot ok';
-  } catch(e) {
-    document.getElementById('statusText').textContent = 'Error loading data';
-    document.getElementById('statusDot').className = 'status-dot err';
-    document.getElementById('main').innerHTML = `
-      <div class="error-box">
-        ⚠️ Could not load match data.<br>
-        <small>${e.message}</small><br><br>
-        This may be a network issue. Try refreshing, or check your internet connection.<br>
-        <a href="${DATA_URL}" target="_blank" style="color:#721c24">View raw data</a>
-      </div>
-    `;
-  } finally {
-    btn.disabled = false;
+    teamStats = processLiveGames(gamesData, teamMap);
+    usingLive = true;
+  } catch(liveErr) {
+    // ── Fallback to openfootball ──
+    try {
+      const resp = await fetch(FALLBACK_URL + '?t=' + Date.now());
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      const data = await resp.json();
+      teamStats = processFallbackMatches(data.matches || []);
+    } catch(fallbackErr) {
+      document.getElementById('statusText').textContent = 'Error loading data';
+      document.getElementById('statusDot').className = 'status-dot err';
+      document.getElementById('main').innerHTML = `
+        <div class="error-box">
+          ⚠️ Could not load match data.<br>
+          <small>Live API: ${String(liveErr.message)} · Fallback: ${String(fallbackErr.message)}</small><br><br>
+          Try refreshing, or check your internet connection.
+        </div>
+      `;
+      btn.disabled = false;
+      return;
+    }
   }
+
+  renderAll(teamStats);
+
+  const now = new Date();
+  document.getElementById('statusText').textContent =
+    (usingLive ? '🔴 Live · ' : '') + 'Updated ' + now.toLocaleTimeString();
+  document.getElementById('statusDot').className = usingLive ? 'status-dot live' : 'status-dot ok';
+  btn.disabled = false;
 }
 
-function processMatches(matches) {
-  // Build per-team stats
-  const stats = {}; // teamName -> stats object
+// ──────────────────────────────────────────────────────────────────────────
+// PROCESS LIVE API GAMES
+// ──────────────────────────────────────────────────────────────────────────
+function processLiveGames(games, teamMap) {
+  const stats = {};
+  const appearedInKnockout = new Set();
 
   function ensureTeam(name) {
     if (!stats[name]) {
       stats[name] = {
-        gp: 0, gw: 0, gd: 0, gl: 0, gf: 0, ga: 0, gpts: 0,
-        knockoutWins: {},   // round -> boolean (won)
-        knockoutLosses: {}, // round -> boolean (lost)
+        gp: 0, gw: 0, gdraw: 0, gl: 0, gf: 0, ga: 0, gpts: 0,
+        knockoutWins: {}, knockoutLosses: {},
         furthestRound: null,
-        isEliminated: false,
-        isWinner: false,
-        isRunnerUp: false,
+        isEliminated: false, isWinner: false, isRunnerUp: false,
       };
     }
     return stats[name];
   }
 
-  // Determine winner of a knockout match (handles ET and penalties)
-  function getWinner(match) {
-    const s = match.score;
-    if (!s) return null;
-    // Use penalties > extra time > full time
-    const [g1, g2] = s.p || s.et || s.ft || [null, null];
-    if (g1 === null) return null;
-    if (g1 > g2) return { winner: match.team1, loser: match.team2 };
-    if (g2 > g1) return { winner: match.team2, loser: match.team1 };
-    return null; // draw (shouldn't happen in knockouts)
-  }
+  for (const m of games) {
+    const t1id = String(m.home_team_id || '');
+    const t2id = String(m.away_team_id || '');
+    const t1 = teamMap[t1id];
+    const t2 = teamMap[t2id];
 
-  // Track which teams have appeared in knockout rounds (= qualified from groups)
-  const appearedInKnockout = new Set();
+    // Skip if team names unknown
+    if (!t1 || !t2) continue;
 
-  for (const m of matches) {
-    const t1 = norm(m.team1);
-    const t2 = norm(m.team2);
+    // Determine stage
+    const isGroup = (m.type === 'group') || !!m.group;
+    const isKnockout = (m.type === 'knockout') || (!m.group && m.type !== 'group');
 
-    // Skip TBD / placeholder teams (like W1, A1, etc.)
-    const isTBD = (n) => /^[A-Z]\d+$/.test(n) || /^W\d+$/.test(n) || /^L\d+$/.test(n) || n.length <= 3 && /\d/.test(n);
-    if (isTBD(t1) || isTBD(t2)) continue;
-
-    if (m.group) {
-      // GROUP STAGE
-      if (!m.score) continue; // not played yet
-      const [g1, g2] = m.score.ft || [0, 0];
+    if (isGroup) {
+      if (!m.finished) continue; // not played yet
+      const g1 = Number(m.home_score) || 0;
+      const g2 = Number(m.away_score) || 0;
 
       const s1 = ensureTeam(t1);
       const s2 = ensureTeam(t2);
@@ -445,35 +552,121 @@ function processMatches(matches) {
       if (g1 > g2) {
         s1.gw++; s1.gpts += 3; s2.gl++;
       } else if (g1 === g2) {
-        s1.gd++; s1.gpts++;
-        s2.gd++; s2.gpts++;
+        s1.gdraw++; s1.gpts++;
+        s2.gdraw++; s2.gpts++;
       } else {
         s2.gw++; s2.gpts += 3; s1.gl++;
       }
-    } else {
-      // KNOCKOUT STAGE
-      const round = m.round || '';
-      const roundOrder = ROUND_ORDER[round] || 0;
-      if (!roundOrder) continue;
 
-      // Just appearing in knockout means qualified from groups
+    } else if (isKnockout) {
+      // Detect round
+      const rawRound = m.round || m.stage || m.matchday_label || '';
+      const round = normRound(String(rawRound)) || 'Round of 32';
+      const roundOrder = ROUND_ORDER[round] || 0;
+
       [t1, t2].forEach(t => {
         ensureTeam(t);
         appearedInKnockout.add(t);
-        if (!stats[t].furthestRound || ROUND_ORDER[stats[t].furthestRound] < roundOrder) {
+        if (!stats[t].furthestRound || (ROUND_ORDER[stats[t].furthestRound] || 0) < roundOrder) {
           stats[t].furthestRound = round;
         }
       });
 
-      if (!m.score) continue; // not played yet
+      if (!m.finished) continue;
 
+      // Determine winner: use penalties > extra time > regular
+      let g1 = Number(m.home_score_pen ?? m.home_score_et ?? m.home_score) || 0;
+      let g2 = Number(m.away_score_pen ?? m.away_score_et ?? m.away_score) || 0;
+
+      if (g1 === g2) continue; // no result yet
+
+      const winner = g1 > g2 ? t1 : t2;
+      const loser  = g1 > g2 ? t2 : t1;
+
+      ensureTeam(winner); ensureTeam(loser);
+
+      if (round === 'Final') {
+        stats[winner].isWinner = true;
+        stats[loser].isRunnerUp = true;
+        stats[loser].isEliminated = true;
+      } else {
+        stats[loser].isEliminated = true;
+      }
+
+      stats[winner].knockoutWins[round] = true;
+      stats[loser].knockoutLosses[round] = true;
+    }
+  }
+
+  return { stats, appearedInKnockout };
+}
+
+// ──────────────────────────────────────────────────────────────────────────
+// FALLBACK: OPENFOOTBALL FORMAT
+// ──────────────────────────────────────────────────────────────────────────
+function processFallbackMatches(matches) {
+  const stats = {};
+  const appearedInKnockout = new Set();
+
+  function ensureTeam(name) {
+    if (!stats[name]) {
+      stats[name] = {
+        gp: 0, gw: 0, gdraw: 0, gl: 0, gf: 0, ga: 0, gpts: 0,
+        knockoutWins: {}, knockoutLosses: {},
+        furthestRound: null,
+        isEliminated: false, isWinner: false, isRunnerUp: false,
+      };
+    }
+    return stats[name];
+  }
+
+  function getWinner(match) {
+    const s = match.score;
+    if (!s) return null;
+    const [g1, g2] = s.p || s.et || s.ft || [null, null];
+    if (g1 === null) return null;
+    if (g1 > g2) return { winner: norm(match.team1), loser: norm(match.team2) };
+    if (g2 > g1) return { winner: norm(match.team2), loser: norm(match.team1) };
+    return null;
+  }
+
+  const isTBD = (n) => /^[A-Z]\d+$/.test(n) || /^W\d+$/.test(n) || /^L\d+$/.test(n) || (n.length <= 3 && /\d/.test(n));
+
+  for (const m of matches) {
+    const t1 = norm(m.team1);
+    const t2 = norm(m.team2);
+    if (isTBD(t1) || isTBD(t2)) continue;
+
+    if (m.group) {
+      if (!m.score) continue;
+      const [g1, g2] = m.score.ft || [0, 0];
+      const s1 = ensureTeam(t1);
+      const s2 = ensureTeam(t2);
+      s1.gp++; s2.gp++;
+      s1.gf += g1; s1.ga += g2;
+      s2.gf += g2; s2.ga += g1;
+      if (g1 > g2) { s1.gw++; s1.gpts += 3; s2.gl++; }
+      else if (g1 === g2) { s1.gdraw++; s1.gpts++; s2.gdraw++; s2.gpts++; }
+      else { s2.gw++; s2.gpts += 3; s1.gl++; }
+    } else {
+      const round = normRound(m.round || '') || 'Round of 32';
+      const roundOrder = ROUND_ORDER[round] || 0;
+      if (!roundOrder) continue;
+
+      [t1, t2].forEach(t => {
+        ensureTeam(t);
+        appearedInKnockout.add(t);
+        if (!stats[t].furthestRound || (ROUND_ORDER[stats[t].furthestRound] || 0) < roundOrder) {
+          stats[t].furthestRound = round;
+        }
+      });
+
+      if (!m.score) continue;
       const result = getWinner(m);
       if (!result) continue;
 
       const { winner, loser } = result;
-
-      ensureTeam(winner);
-      ensureTeam(loser);
+      ensureTeam(winner); ensureTeam(loser);
 
       if (round === 'Final') {
         stats[winner].isWinner = true;
@@ -497,24 +690,11 @@ function processMatches(matches) {
 function calcPoints(teamName, stats, appearedInKnockout) {
   const s = stats[teamName];
   if (!s) return 0;
-
-  let pts = 0;
-
-  // Group points (3 per win, 1 per draw)
-  pts += s.gpts;
-
-  // Qualified from group stage
+  let pts = s.gpts;
   if (appearedInKnockout.has(teamName)) pts += ROUND_BONUS['groups_qualified'];
-
-  // Knockout wins
   for (const round of Object.keys(s.knockoutWins)) {
-    if (round === 'Final') {
-      pts += ROUND_BONUS['Final_winner'];
-    } else {
-      pts += ROUND_BONUS[round] || 0;
-    }
+    pts += round === 'Final' ? ROUND_BONUS['Final_winner'] : (ROUND_BONUS[round] || 0);
   }
-
   return pts;
 }
 
@@ -536,15 +716,11 @@ function getTeamStatus(teamName, s, appearedInKnockout) {
     const classes = { 'Round of 32': 'badge-r32', 'Round of 16': 'badge-r16', 'Quarter-final': 'badge-qf', 'Semi-final': 'badge-sf', 'Final': 'badge-sf' };
     return { label: '✓ ' + (labels[r] || r), badgeClass: classes[r] || 'badge-active', rowClass: 'active' };
   }
-  // Still in group stage
-  if (s.gp > 0) {
-    return { label: 'Groups', badgeClass: 'badge-active', rowClass: 'active' };
-  }
+  if (s.gp > 0) return { label: 'Groups', badgeClass: 'badge-active', rowClass: 'active' };
   return { label: 'Upcoming', badgeClass: 'badge-pending', rowClass: 'pending' };
 }
 
 function renderAll({ stats, appearedInKnockout }) {
-  // Calculate player totals
   const players = DRAW.map(p => {
     const total = p.teams.reduce((sum, t) => sum + calcPoints(t, stats, appearedInKnockout), 0);
     const alive = p.teams.filter(t => {
@@ -555,13 +731,11 @@ function renderAll({ stats, appearedInKnockout }) {
   }).sort((a, b) => b.total - a.total);
 
   const maxPts = players[0]?.total || 1;
-
-  // Check if any matches have been played
   const anyPlayed = Object.keys(stats).length > 0;
 
   let html = '';
 
-  // ── SCORING KEY ──
+  // Scoring key
   html += `
     <div class="scoring-info">
       <strong>Points:</strong>
@@ -573,7 +747,7 @@ function renderAll({ stats, appearedInKnockout }) {
     </div>
   `;
 
-  // ── LEADERBOARD ──
+  // Leaderboard
   html += `<div class="leaderboard-card"><div class="section-title">🏅 Leaderboard</div>`;
 
   if (!anyPlayed) {
@@ -582,8 +756,8 @@ function renderAll({ stats, appearedInKnockout }) {
     </div>`;
   } else {
     players.forEach((p, i) => {
-      const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
       const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
       const barPct = maxPts > 0 ? Math.round((p.total / maxPts) * 100) : 0;
       html += `
         <div class="lb-row">
@@ -606,10 +780,9 @@ function renderAll({ stats, appearedInKnockout }) {
   }
   html += `</div>`;
 
-  // ── PLAYER CARDS ──
+  // Player cards
   html += `<div class="players-grid">`;
 
-  // Render in original draw order, not sorted
   DRAW.forEach(p => {
     const pData = players.find(x => x.name === p.name);
     const total = pData?.total || 0;
@@ -631,7 +804,7 @@ function renderAll({ stats, appearedInKnockout }) {
         <div class="teams-list">
     `;
 
-    // Sort teams: winner first, then by sweepstake pts desc, then eliminated last
+    // Sort: winner first, then by pts desc, eliminated last
     const sorted = [...p.teams].sort((a, b) => {
       const sa = stats[a], sb = stats[b];
       if (sa?.isWinner && !sb?.isWinner) return -1;
@@ -648,11 +821,21 @@ function renderAll({ stats, appearedInKnockout }) {
       const s = stats[teamName];
       const { label, badgeClass, rowClass } = getTeamStatus(teamName, s, appearedInKnockout);
       const flag = FLAGS[teamName] || '🏳';
-      const record = s && s.gp > 0
-        ? `${s.gw}W ${s.gd}D ${s.gl}L`
-        : '';
+
+      // W/D/L record
+      const record = s && s.gp > 0 ? `${s.gw}W ${s.gdraw}D ${s.gl}L` : '';
+
+      // Goal difference
+      let gdHtml = '';
+      if (s && s.gp > 0) {
+        const gd = s.gf - s.ga;
+        const gdClass = gd > 0 ? 'pos' : gd < 0 ? 'neg' : 'zero';
+        const gdStr = gd > 0 ? `+${gd}` : String(gd);
+        gdHtml = `<span class="t-gd ${gdClass}">GD ${gdStr}</span>`;
+      }
+
       const teamPts = calcPoints(teamName, stats, appearedInKnockout);
-      const ptsDisplay = anyPlayed ? `<span style="font-size:11px;font-weight:700;color:#555;margin-right:4px">${teamPts}pt</span>` : '';
+      const ptsDisplay = anyPlayed ? `<span style="font-size:11px;font-weight:700;color:#555;margin-right:2px">${teamPts}pt</span>` : '';
 
       html += `
         <div class="team-row ${rowClass}">
@@ -660,6 +843,7 @@ function renderAll({ stats, appearedInKnockout }) {
           <span class="t-name">${teamName}</span>
           ${ptsDisplay}
           <span class="t-record">${record}</span>
+          ${gdHtml}
           <span class="t-badge ${badgeClass}">${label}</span>
         </div>
       `;
@@ -675,12 +859,10 @@ function renderAll({ stats, appearedInKnockout }) {
 }
 
 // ──────────────────────────────────────────────────────────────────────────
-// BOOT
+// BOOT — load now, then auto-refresh every 2 minutes
 // ──────────────────────────────────────────────────────────────────────────
 loadData();
-
-// Auto-refresh every 5 minutes
-setInterval(loadData, 5 * 60 * 1000);
+setInterval(loadData, 2 * 60 * 1000);
 </script>
 </body>
 </html>
