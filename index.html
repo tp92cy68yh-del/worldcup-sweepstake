@@ -167,7 +167,7 @@ body {
 .team-row {
   display: flex; align-items: center;
   padding: 5px 7px;
-  border-radius: 8px;
+  border-radius: 3px;
   margin-bottom: 2px;
   gap: 7px;
 }
@@ -176,6 +176,7 @@ body {
 .team-row.winner   { background: #fffce0; border: 1px solid #ffd700; }
 .team-row.eliminated { background: #fafafa; opacity: 0.5; }
 .team-row.pending  { background: #fafafa; }
+.team-row.golden   { border-left: 3px solid #d4a900; border-right: 3px solid #d4a900; }
 
 .t-flag { font-size: 18px; flex-shrink: 0; width: 24px; text-align: center; }
 .t-name { flex: 1; font-size: 12px; font-weight: 700; }
@@ -356,6 +357,34 @@ const ALIASES = {
 function norm(name) {
   if (!name) return name;
   return ALIASES[name] || name;
+}
+
+// FIFA World Rankings (approximate, June 2026 — lower = higher ranked)
+const FIFA_RANK = {
+  'Argentina': 1, 'France': 2, 'Spain': 3, 'England': 4,
+  'Brazil': 5, 'Portugal': 6, 'Belgium': 7, 'Netherlands': 8,
+  'Germany': 9, 'Croatia': 10, 'Morocco': 11, 'USA': 12,
+  'Japan': 13, 'Uruguay': 14, 'Colombia': 15, 'Switzerland': 16,
+  'Mexico': 17, 'South Korea': 18, 'Senegal': 19, 'Ecuador': 20,
+  'Austria': 21, 'Turkey': 22, 'Norway': 23, 'Australia': 24,
+  'Canada': 25, 'Algeria': 26, 'Ivory Coast': 27, 'Scotland': 28,
+  'Ghana': 29, 'Tunisia': 30, 'Sweden': 31, 'Iran': 32,
+  'Czech Republic': 33, 'Egypt': 34, 'South Africa': 35, 'Saudi Arabia': 36,
+  'Paraguay': 37, 'New Zealand': 38, 'Uzbekistan': 39, 'DR Congo': 40,
+  'Qatar': 41, 'Panama': 42, 'Cape Verde': 43, 'Jordan': 44,
+  'Iraq': 45, 'Bosnia & Herz.': 46, 'Curaçao': 47, 'Haiti': 48,
+};
+
+function getBestTeam(teams, stats) {
+  // Always based on FIFA world ranking — highest ranked active (non-eliminated) team
+  const active = teams.filter(t => {
+    const s = stats[t];
+    return !s || (!s.isEliminated && !s.isRunnerUp);
+  });
+  if (active.length === 0) return null;
+  return active.reduce((best, t) =>
+    (FIFA_RANK[t] || 99) < (FIFA_RANK[best] || 99) ? t : best
+  );
 }
 
 // Knockout round ordering
@@ -864,6 +893,8 @@ function renderAll({ stats, appearedInKnockout }) {
         <div class="teams-list">
     `;
 
+    const goldenTeam = getBestTeam(p.teams, stats);
+
     // Sort: winner first, then by pts desc, eliminated last
     const sorted = [...p.teams].sort((a, b) => {
       const sa = stats[a], sb = stats[b];
@@ -880,6 +911,7 @@ function renderAll({ stats, appearedInKnockout }) {
     sorted.forEach(teamName => {
       const s = stats[teamName];
       const { label, badgeClass, rowClass } = getTeamStatus(teamName, s, appearedInKnockout);
+      const isGolden = teamName === goldenTeam;
       const flag = FLAGS[teamName] || '🏳';
 
       // W/D/L record
@@ -898,7 +930,7 @@ function renderAll({ stats, appearedInKnockout }) {
       const ptsDisplay = anyPlayed ? `<span style="font-size:11px;font-weight:700;color:#555;margin-right:2px">${teamPts}pt</span>` : '';
 
       html += `
-        <div class="team-row ${rowClass}">
+        <div class="team-row ${rowClass} ${isGolden ? 'golden' : ''}">
           <span class="t-flag">${flag}</span>
           <span class="t-name">${teamName}</span>
           ${ptsDisplay}
