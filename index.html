@@ -756,7 +756,8 @@ function renderAll({ stats, appearedInKnockout }) {
     </div>`;
   } else {
     players.forEach((p, i) => {
-      const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : (i + 1);
+      const isLast = i === players.length - 1;
+      const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : isLast ? '🥄' : (i + 1);
       const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
       const barPct = maxPts > 0 ? Math.round((p.total / maxPts) * 100) : 0;
       html += `
@@ -779,6 +780,58 @@ function renderAll({ stats, appearedInKnockout }) {
     });
   }
   html += `</div>`;
+
+  // Wooden Spoon Watch
+  if (anyPlayed) {
+    // Find the worst individual team — ranked by: most losses, then least points, then worst GD
+    let worstTeam = null, worstPts = Infinity, worstOwner = null;
+    let candidates = [];
+    DRAW.forEach(p => {
+      p.teams.forEach(t => {
+        const s = stats[t];
+        if (!s || s.gp === 0) return;
+        candidates.push({ team: t, owner: p, s, pts: calcPoints(t, stats, appearedInKnockout) });
+      });
+    });
+    candidates.sort((a, b) => {
+      if (b.s.gl !== a.s.gl) return b.s.gl - a.s.gl;       // most losses first
+      if (a.pts !== b.pts) return a.pts - b.pts;             // least points first
+      const gdA = a.s.gf - a.s.ga, gdB = b.s.gf - b.s.ga;
+      return gdA - gdB;                                       // worst GD first
+    });
+    if (candidates.length > 0) {
+      worstTeam = candidates[0].team;
+      worstOwner = candidates[0].owner;
+      worstPts = candidates[0].pts;
+    }
+
+    if (worstTeam && worstOwner) {
+      const ws = stats[worstTeam];
+      const gd = ws.gf - ws.ga;
+      const gdStr = gd >= 0 ? `+${gd}` : String(gd);
+      html += `
+        <div class="leaderboard-card" style="margin-bottom:20px;border-color:#f5c6cb">
+          <div class="section-title" style="background:linear-gradient(135deg,#7b1e1e,#c0392b)">
+            🥄 Wooden Spoon Watch
+          </div>
+          <div class="lb-row" style="gap:12px;padding:14px">
+            <span style="font-size:32px">${FLAGS[worstTeam] || '🏳'}</span>
+            <div style="flex:1">
+              <div style="font-weight:900;font-size:16px">${worstTeam}</div>
+              <div style="font-size:12px;color:#999;margin-top:2px">
+                ${ws.gw}W ${ws.gdraw}D ${ws.gl}L &nbsp;·&nbsp; GD ${gdStr} &nbsp;·&nbsp;
+                <span style="color:${worstOwner.color};font-weight:700">${worstOwner.name}</span>'s team
+              </div>
+            </div>
+            <div style="text-align:right">
+              <div style="font-size:26px;font-weight:900;color:#c0392b">${worstPts}</div>
+              <div style="font-size:10px;color:#aaa;text-transform:uppercase;letter-spacing:1px">pts</div>
+            </div>
+          </div>
+        </div>
+      `;
+    }
+  }
 
   // Player cards
   html += `<div class="players-grid">`;
