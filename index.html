@@ -728,7 +728,13 @@ function renderAll({ stats, appearedInKnockout }) {
       return !s || (!s.isEliminated && !s.isRunnerUp);
     }).length;
     return { ...p, total, alive };
-  }).sort((a, b) => b.total - a.total);
+  }).sort((a, b) => {
+    if (b.total !== a.total) return b.total - a.total;  // most points first
+    // Tiebreaker: combined goal difference across all their teams
+    const gdA = a.teams.reduce((sum, t) => { const s = stats[t]; return sum + (s ? s.gf - s.ga : 0); }, 0);
+    const gdB = b.teams.reduce((sum, t) => { const s = stats[t]; return sum + (s ? s.gf - s.ga : 0); }, 0);
+    return gdB - gdA;
+  });
 
   const maxPts = players[0]?.total || 1;
   const anyPlayed = Object.keys(stats).length > 0;
@@ -759,13 +765,14 @@ function renderAll({ stats, appearedInKnockout }) {
       const isLast = i === players.length - 1;
       const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : isLast ? '🥄' : (i + 1);
       const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
+      const prize = i === 0 ? '💰 £15' : i === 1 ? '💰 £7.50' : i === 2 ? '💰 £7.50' : '';
       const barPct = maxPts > 0 ? Math.round((p.total / maxPts) * 100) : 0;
       html += `
         <div class="lb-row">
           <div class="lb-rank ${rankClass}">${rankEmoji}</div>
           <div class="lb-avatar" style="background:linear-gradient(135deg,${p.color},${p.color2})">${p.name[0]}</div>
           <div style="flex:1">
-            <div class="lb-name">${p.name}</div>
+            <div class="lb-name">${p.name} ${prize ? `<span style="font-size:12px;font-weight:700;color:#c8960c">${prize}</span>` : ''}</div>
             <div class="lb-meta">${p.alive} team${p.alive !== 1 ? 's' : ''} still in</div>
           </div>
           <div class="lb-bar-wrap" style="margin-right:12px">
