@@ -768,6 +768,30 @@ function renderAll({ stats, appearedInKnockout }) {
   const maxPts = players[0]?.total || 1;
   const anyPlayed = Object.keys(stats).length > 0;
 
+  // Calculate wooden spoon owner up front so leaderboard can use it
+  let worstTeam = null, worstPts = Infinity, worstOwner = null;
+  if (anyPlayed) {
+    let candidates = [];
+    DRAW.forEach(p => {
+      p.teams.forEach(t => {
+        const s = stats[t];
+        if (!s || s.gp === 0) return;
+        candidates.push({ team: t, owner: p, s, pts: calcPoints(t, stats, appearedInKnockout) });
+      });
+    });
+    candidates.sort((a, b) => {
+      if (b.s.gl !== a.s.gl) return b.s.gl - a.s.gl;
+      if (a.pts !== b.pts) return a.pts - b.pts;
+      const gdA = a.s.gf - a.s.ga, gdB = b.s.gf - b.s.ga;
+      return gdA - gdB;
+    });
+    if (candidates.length > 0) {
+      worstTeam = candidates[0].team;
+      worstOwner = candidates[0].owner;
+      worstPts = candidates[0].pts;
+    }
+  }
+
   let html = '';
 
   // Scoring key
@@ -791,8 +815,8 @@ function renderAll({ stats, appearedInKnockout }) {
     </div>`;
   } else {
     players.forEach((p, i) => {
-      const isLast = i === players.length - 1;
-      const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : isLast ? '🥄' : (i + 1);
+      const isSpoon = worstOwner && p.name === worstOwner.name;
+      const rankEmoji = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : isSpoon ? '🥄' : (i + 1);
       const rankClass = i === 0 ? 'p1' : i === 1 ? 'p2' : i === 2 ? 'p3' : '';
       const prize = i === 0 ? '💰 £15' : i === 1 ? '💰 £7.50' : i === 2 ? '💰 £7.50' : '';
       const barPct = maxPts > 0 ? Math.round((p.total / maxPts) * 100) : 0;
@@ -819,28 +843,6 @@ function renderAll({ stats, appearedInKnockout }) {
 
   // Wooden Spoon Watch
   if (anyPlayed) {
-    // Find the worst individual team — ranked by: most losses, then least points, then worst GD
-    let worstTeam = null, worstPts = Infinity, worstOwner = null;
-    let candidates = [];
-    DRAW.forEach(p => {
-      p.teams.forEach(t => {
-        const s = stats[t];
-        if (!s || s.gp === 0) return;
-        candidates.push({ team: t, owner: p, s, pts: calcPoints(t, stats, appearedInKnockout) });
-      });
-    });
-    candidates.sort((a, b) => {
-      if (b.s.gl !== a.s.gl) return b.s.gl - a.s.gl;       // most losses first
-      if (a.pts !== b.pts) return a.pts - b.pts;             // least points first
-      const gdA = a.s.gf - a.s.ga, gdB = b.s.gf - b.s.ga;
-      return gdA - gdB;                                       // worst GD first
-    });
-    if (candidates.length > 0) {
-      worstTeam = candidates[0].team;
-      worstOwner = candidates[0].owner;
-      worstPts = candidates[0].pts;
-    }
-
     if (worstTeam && worstOwner) {
       const ws = stats[worstTeam];
       const gd = ws.gf - ws.ga;
